@@ -172,6 +172,68 @@ MemberRepository의 메모리 구현체
 
 → 실무는 ConcurrentHashMap, AtomicLong 등을 사용하여 동시성 문제 극복
 
+# Service 만들기
+
+## 메소드 네이밍
+
+- repository
+
+    비즈니스 로직과는 별개로, 데이터에 접근하기 위해 필요한 원초적인 기능에 걸맞게 네이밍
+
+    e.g., save, find ...
+
+- service
+
+    실제 비즈니스 로직을 나타내므로, 기획이나 요구사항에 맞게 네이밍
+
+    e.g., join, find ...
+
+### MemberService
+
+`repository` 패키지를 생성 후, 내부에 MemberService 클래스 생성
+
+```jsx
+package com.example.springbootmemberServicedemo.service;
+
+import com.example.springbootmemberServicedemo.domain.Member;
+import com.example.springbootmemberServicedemo.repository.MemberRepository;
+import com.example.springbootmemberServicedemo.repository.MemoryMemberRepository;
+
+import java.util.List;
+import java.util.Optional;
+
+public class MemberService {
+
+    private final MemberRepository memberRepository = new MemoryMemberRepository();
+
+    private void validateDuplicateMember(Member member) {
+        memberRepository.findByName(member.getName())
+                .ifPresent(m -> {
+                    throw new IllegalStateException("이미 존재하는 회원입니다.");
+                });
+    }
+
+    // 회원 가입
+    public Long join(Member member) {
+        validateDuplicateMember(member); // 중복 검사
+
+        memberRepository.save(member);
+
+        return member.getId();
+    }
+
+    // 전체 회원 조회
+    public List<Member> findMembers() {
+        return memberRepository.findAll();
+    }
+
+    // 특정 회원 조회
+    public Optional<Member> findMember(Long memberId) {
+        return memberRepository.findById(memberId);
+    }
+}
+```
+
 # TestCase
 
 JUnit, assertj 와 같은 테스트 프레임워크를 이용하여 테스트케이스를 작성
