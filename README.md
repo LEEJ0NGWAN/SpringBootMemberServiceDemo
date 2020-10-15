@@ -171,3 +171,107 @@ MemberRepository의 메모리 구현체
 동시성 문제가 고려되지 않았음
 
 → 실무는 ConcurrentHashMap, AtomicLong 등을 사용하여 동시성 문제 극복
+
+# TestCase
+
+JUnit, assertj 와 같은 테스트 프레임워크를 이용하여 테스트케이스를 작성
+
+`src/test/java/아티팩트이름` 내부에 패키지를 생성하고 Test용 클래스 파일을 만드는 것이 통상적
+
+테스트 하고자 하는 클래스의 이름 뒤에 `Test` 를 붙이는 것도 통상적
+
+### MemoryMemberRepositoryTest
+
+- src
+
+    → test
+
+    → java
+
+    → com.example.springbootmemberServicedemo
+
+    → repository (패키지)
+
+    ⇒ MemoryMemberRepositoryTest
+
+```jsx
+package com.example.springbootmemberServicedemo.repository;
+
+import com.example.springbootmemberServicedemo.domain.Member;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+//import org.junit.jupiter.api.Assertions;
+
+class MemoryMemberRepositoryTest {
+
+    MemoryMemberRepository repos = new MemoryMemberRepository();
+
+    @AfterEach
+    public void afterEach() {
+        repos.clearStore();
+    }
+
+    @Test
+    public void save() {
+        Member member = new Member();
+
+        member.setName("TestUser");
+        repos.save(member);
+
+        Member result = repos.findById(member.getId()).get();
+
+        // JUnit Assertion
+        // Assertions.assertEquals(member, result);가
+
+        // assertj Assertion
+        assertThat(member).isEqualTo(result);
+
+    }
+
+    @Test
+    public void findByName() {
+        Member member1 = new Member();
+        member1.setName("Test1");
+        repos.save(member1);
+
+        Member member2 = new Member();
+        member2.setName("Test2");
+        repos.save(member2);
+
+        Member result = repos.findByName("Test1").get();
+        assertThat(member1).isEqualTo(result);
+
+    }
+
+    @Test
+    public void findAll() {
+        Member member1 = new Member();
+        member1.setName("Test1");
+        repos.save(member1);
+
+        Member member2 = new Member();
+        member2.setName("Test2");
+        repos.save(member2);
+
+        List<Member> result = repos.findAll();
+
+        assertThat(result.size()).isEqualTo(2);
+
+    }
+}
+```
+
+- `JUnit` 프레임워크 혹은 `assertj` 프레임워크를 이용해 assert 검증을 기능별로 실시
+
+    → `assertj` 프레임워크의 `assertThat` 메소드는 static 메소드로 static 임포트로 불러와서 사용
+
+- `@AfterEach` 애노테이션을 이용하여 각 기능의 테스트 뒤에 실행할, 일종의 콜백을 설정할 수 있음
+
+    → 각 테스트 후 리포지토리를 초기화 시켜줌으로써 각 기능 테스트들이 서로에게 관여되지 않도록 설정
+
+- 각 테스트는 독립적이어야함 → 테스트 간의 의존관계나 순서가 있는 것은 결코 좋은 것이 아님
+- 이런 테스트케이스를 먼저 만들고 로직을 만드는 방법이 TDD
