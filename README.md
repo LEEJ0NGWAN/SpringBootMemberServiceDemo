@@ -187,6 +187,9 @@ MemberRepository의 메모리 구현체
     실제 비즈니스 로직을 나타내므로, 기획이나 요구사항에 맞게 네이밍
 
     e.g., join, find ...
+## 의존성 주입하기
+
+각 서비스는 자신이 이용할 리포지토리를 new 키워드를 통해서 생성하지 말고 의존성 주입으로 받아온다.
 
 ### MemberService
 
@@ -204,7 +207,12 @@ import java.util.Optional;
 
 public class MemberService {
 
-    private final MemberRepository memberRepository = new MemoryMemberRepository();
+    private final MemberRepository memberRepository;
+
+    // 의존성 주입
+    public MemberService(MemberRepository memberRepository) {
+        this.memberRepository = memberRepository;
+    }
 
     private void validateDuplicateMember(Member member) {
         memberRepository.findByName(member.getName())
@@ -337,3 +345,79 @@ class MemoryMemberRepositoryTest {
 
 - 각 테스트는 독립적이어야함 → 테스트 간의 의존관계나 순서가 있는 것은 결코 좋은 것이 아님
 - 이런 테스트케이스를 먼저 만들고 로직을 만드는 방법이 TDD
+
+### MemberServiceTest
+
+`service` 패키지 생성 후, 내부에 MemberServiceTest 클래스 생성
+
+```jsx
+package com.example.springbootmemberServicedemo.service;
+
+import com.example.springbootmemberServicedemo.domain.Member;
+import com.example.springbootmemberServicedemo.repository.MemoryMemberRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.*;
+
+public class MemberServiceTest {
+    MemberService memberService;
+    MemoryMemberRepository memoryMemberRepository;
+
+    @BeforeEach
+    public void beforeEach() {
+        memoryMemberRepository = new MemoryMemberRepository();
+        memberService = new MemberService(memoryMemberRepository);
+    }
+
+    @AfterEach
+    public void afterEach() {
+        memoryMemberRepository.clearStore();
+
+    }
+
+    @Test
+    public void join() {
+        // given
+        Member member = new Member();
+        member.setName("TEST");
+
+        // when
+        Long saveId = memberService.join(member);
+
+        // then
+        Member result = memberService.findMember(saveId).get();
+        assertThat(member.getName()).isEqualTo(result.getName());
+    }
+
+    @Test
+    public void duplicated_join_exception() {
+        // given
+        Member member1 = new Member();
+        member1.setName("TEST");
+
+        Member member2 = new Member();
+        member2.setName("TEST");
+
+        // when
+        memberService.join(member1);
+
+        /*
+        try {
+            memberService.join(member2);
+            fail("");
+        } catch (IllegalStateException e) {
+            assertThat(e.getMessage()).isEqualTo("이미 존재하는 회원입니다.");
+        }
+        */
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> memberService.join(member2));
+        assertThat(e.getMessage()).isEqualTo("이미 존재하는 회원입니다.");
+
+        // then
+    }
+}
+```
+
