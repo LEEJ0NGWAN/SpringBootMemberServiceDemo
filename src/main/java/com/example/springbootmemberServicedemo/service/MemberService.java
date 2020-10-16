@@ -2,14 +2,18 @@ package com.example.springbootmemberServicedemo.service;
 
 import com.example.springbootmemberServicedemo.domain.Member;
 import com.example.springbootmemberServicedemo.repository.MemberRepository;
-import com.example.springbootmemberServicedemo.repository.MemoryMemberRepository;
 
 import java.util.List;
 import java.util.Optional;
 
 public class MemberService {
 
-    private final MemberRepository memberRepository = new MemoryMemberRepository();
+    private final MemberRepository memberRepository;
+
+    // 의존성 주입
+    public MemberService(MemberRepository memberRepository) {
+        this.memberRepository = memberRepository;
+    }
 
     private void validateDuplicateMember(Member member) {
         memberRepository.findByName(member.getName())
