@@ -512,3 +512,85 @@ public class MemberController {
 
 이렇게 `@Component` 를 이용하여 빈 등록하는 방법이 컴포넌트 스캔 방식
 
+## 직접 스프링 빈 등록하기
+
+`@Configuration` : 스프링을 설정 관련 클래스라는 것을 나타내는 애노테이션
+
+`@Bean` : 스프링 컨테이너에서 관리되는 객체(Bean)라는 것을 나타내는 애노테이션
+
+설정 파일 안에서 `@Bean` 을 이용하여 스프링 객체를 등록
+
+→ 상황에 따라 구현 클래스를 변경해야 하는 경우가 잦은 빈 등록에 용이
+
+### SpringConfig
+
+```jsx
+@Configuration
+public class SpringConfig {
+	
+	@Bean
+	public MemberService memberService() {
+		return new MemberService(memberRepository());
+	}
+
+	@Bean
+	public MemberRepository memoryRepository() {
+		return new MemoryMemberRepository();
+	}
+
+}
+```
+
+MemberRepository 의 경우, 데이터 저장소의 선정에 따라 쉽게 변경될 수 있는 빈
+
+그러므로, 설정 파일에 직접 빈 등록을 하는 것을 통해, 다른 코드들을 변경하는 것 없이 손쉽게 MemberRepository 빈 클래스를 변경시킬 수 있도록 함
+
+→ 현재는 메모리 구현체이지만, 추후 DB 리포지토리로 변경해야하기 때문
+
+(config 파일에 빈 등록 되었기 때문에, @Repository와 @Service 애노테이션은 지워야함)
+
+## 참고 사항
+
+- XML 파일로 빈 등록하는 방법도 있으나 레거시; 즉, 현재는 거의 사용하지 않음
+- 실무에서 정형화된 코드는 컴포넌트 스캔 방식을 사용
+
+    → 정형화 되지 않고, 상황에 따라 구현 클래스를 변경해야 하는 객체는 설정을 통해 빈 등록
+
+- DI 방법
+    - 필드 주입
+
+        → 거의 사용하지 않음
+
+        ```jsx
+        @Autowired private MemberRepository;
+        ```
+
+    - setter 주입
+
+        → 이전에는 많이 사용했으나, 한번 주입된 의존성을 바꿀 수 있다는 위험이 존재함
+
+        ```jsx
+        @Autowired
+        public void setMemberRepository(MemberRepository memberRepository) {
+        	this.memberRepository = memberRepository;
+        }
+        ```
+
+    - 생성자 주입
+
+        의존 관계가 실행 중 동적으로 바뀌는 경우는 거의 없음
+
+        → 의존성 주입은 생성자 주입 방법이 권장됨
+
+        ```jsx
+        @Autowired
+        public MemberService(MemberRepository memberRepository) {
+        	this.memberRepository = memberRepository;
+        }
+        ```
+
+- @Autowired
+
+    `@Autowired` 를 통한 의존성 주입은 오직 스프링 컨테이너에서 관리되는 빈에서 동작
+
+    빈이 아닌 일반 객체나 직접 생성한 객체에서는 동작하지 않음
