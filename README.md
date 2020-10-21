@@ -421,3 +421,94 @@ public class MemberServiceTest {
 }
 ```
 
+# 스프링 빈과 의존 관계
+
+## 컴포넌트 스캔과 자동 의존 관계 설정
+
+`Bean` : 스프링 차원에서 관리하는 객체; 스프링 컨테이너 상에 존재하게 됨
+
+`싱글톤` : 스프링이 관리하는 객체(Bean)는 통상적으로 클래스 종류 당 1개씩 생성해서 여러 곳에 재사용 함
+
+`@Component` : 스프링이 관리해야 하는 객체(Bean) 임을 나타내는 애노테이션; 직접적으로 쓰이지 않는다.
+
+→ `@Component` 를 포함하는 애노테이션도 빈으로 자동 등록
+
+- `@Controller`
+- `@Service`
+- `@Repository`
+
+`@Autowired` : 의존성 주입을 위해 사용하는 애노테이션; 스프링 컨테이너에서 연관된 빈을 찾아서 주입해줌
+
+- 의존성 주입(Dependency Injection) : 객체 의존 관계를 외부에서 주입시켜 주는 것
+
+### MemoryMemberRepository
+
+`@Repository` 를 추가하여 빈으로 등록
+
+```jsx
+...
+
+@Repository
+public class MemoryMemberRepository implements MemberRepository {
+	...
+}
+```
+
+### MemberService
+
+`@Service` 를 추가하여 빈으로 등록
+
+`@Autowired` 를 이용하여 스프링 컨테이너에 등록된 MemoryMemberRepository 빈 의존성 주입
+
+```jsx
+...
+
+@Service
+public class MemberService {
+	
+	private final MemberRepository memberRepository;
+
+	@Autowired
+	public MemberService(MemberRepository memberRepository) {
+		this.memberRepository = memberRepository;
+	}
+
+	...
+}
+```
+
+### MemberController
+
+`@Controller` 를 통해서 MemberController를 빈 등록
+
+`@Autowired` 를 통해서 스프링 컨테이너에 등록된 MemberService 빈과 연결
+
+```jsx
+package com.example.springbootmemberServicedemo.controller;
+
+import com.example.springbootmemberServicedemo.service.MemberService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+
+@Controller
+public class MemberController {
+
+    private final MemberService memberService;
+
+    @Autowired
+    public MemberController(MemberService memberService) {
+        this.memberService = memberService;
+    }
+}
+```
+
+### `Autowired` 로 연결된 객체(Bean)들의 관계 정보
+
+![autowired.png](./image/autowired.png)
+
+`ComponentScan`
+
+처음 스프링 부트 애플리케이션이 시작할 때, 스프링 부트 애플리케이션 클래스가 소속된 패키지와 그 하위의 모든 패키지를 전부 수색; `@Component` 가 붙어 있는 모든 클래스를 스프링 컨테이너로 객체(Bean) 등록
+
+이렇게 `@Component` 를 이용하여 빈 등록하는 방법이 컴포넌트 스캔 방식
+
