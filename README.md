@@ -594,3 +594,171 @@ MemberRepository 의 경우, 데이터 저장소의 선정에 따라 쉽게 변�
     `@Autowired` 를 통한 의존성 주입은 오직 스프링 컨테이너에서 관리되는 빈에서 동작
 
     빈이 아닌 일반 객체나 직접 생성한 객체에서는 동작하지 않음
+    
+# 웹 MVC 개발
+
+## 회원 웹 기능: 홈 화면
+
+### HomeController
+
+```jsx
+package com.example.springbootmemberServicedemo.controller;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+
+@Controller
+public class HomeController {
+
+    @GetMapping("/")
+    public String home() {
+        return "home";
+    }
+}
+```
+
+`/` 에 대한 템플릿 파일 home.html을 설정하게 되므로 디폴트 웰컴 페이지 index.html의 우선순위가 낮아짐
+
+### home.html
+
+```jsx
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+    <div class="container">
+        <div>
+            <h1>Hello Spring</h1>
+						<p>회원 기능</p>
+            <p>
+                <a href="/members/new">회원 가입</a> <a href="/members">회원 목록</a>
+            </p> 
+				</div>
+    </div> <!-- /container -->
+</body>
+</html>
+```
+
+컨트롤러가 return 하여 렌더링 되는 html이 웰컴페이지보다 viewResolver에서 우선순위가 더 높다
+
+## 회원 웹 기능: 등록
+
+### MemberForm
+
+회원 등록 시 데이터를 전달 받을 폼 객체
+
+```jsx
+package com.example.springbootmemberServicedemo.controller;
+
+public class MemberForm {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+```
+
+### MemberController
+
+회원 등록 페이지를 보여주는 기능과 회원을 등록하는 기능 추가
+
+```jsx
+@GetMapping("/members/new")
+public String createForm() {
+		return "members/createMemberForm";
+}
+
+@PostMapping("/members/new")
+public String create(MemberForm form) {
+	  Member member = new Member();
+	  member.setName(form.getName());
+
+	  memberService.join(member);
+
+	  return "redirect:/";
+}
+```
+
+템플릿에서 전달 받는 데이터는 자동으로 setName 함수를 통해 MemberForm 객체에 저장됨
+
+### members/createMemberForm.html
+
+```jsx
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+	<div class="container">
+    <form action="/members/new" method="post">
+        <div class="form-group">
+            <label for="name">이름</label>
+            <input type="text" id="name" name="name" placeholder="이름을 입력하세요">
+        </div>
+        <button type="submit">등록</button>
+		</form>
+	</div> <!-- /container -->
+</body>
+</html>
+```
+
+form 태그의 `action` 속성 `/members/new` 로 [POST]를 보냄
+
+`<input>` 태그로 건네줄 데이터 name 데이터는 MemberForm 객체의 내부에 setName 메소드를 통해 자동으로 데이터가 저장됨
+
+이때, `<input>` 태그의 `name` 속성의 이름에 맞는 필드에 저장됨
+
+→ 즉, MemberForm 클래스의 `name` 필드와 맵핑
+
+## 회원 웹 기능 - 조회
+
+### MemberController
+
+회원 조회 기능 추가
+
+```jsx
+@GetMapping("/members")
+public String list(Model model) {
+    List<Member> members = memberService.findMembers();
+    model.addAttribute("members", members);
+
+    return "members/memberList";
+}
+```
+
+### members/memberList.html
+
+```jsx
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div class="container">
+    <div>
+        <table>
+            <thead>
+            <tr>
+                <th>#</th>
+                <th>이름</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="member : ${members}">
+                <td th:text="${member.id}"></td>
+                <td th:text="${member.name}"></td> </tr>
+            </tbody>
+        </table>
+    </div>
+</div> <!-- /container -->
+</body>
+</html>
+```
+
+타임 리프의 문법이 가미된 템플릿 파일
+
+th:each 는 Foreach와 같은 기능을 수행
+
+`${members}` 를 통해서 현재 스프링 애플리케이션의 Model에 `members` 라는 키로 저장된 값을 가져옴
+
+→ 이때 members의 값은 List 객체이므로 타임 리프의 반복문 `th:each` 문법 수행 가능
