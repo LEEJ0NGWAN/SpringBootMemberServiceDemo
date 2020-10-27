@@ -794,3 +794,255 @@ CREATE TABLE member (
 );
 ```
 
+## 순수 JDBC
+
+### 환경 설정
+
+**build.gradle**
+
+jdbc, h2 데이터베이스 관련 의존성 추가
+
+```jsx
+implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+runtimeOnly 'com.h2database:h2'
+```
+
+**resources/application.properties**
+
+```jsx
+spring.datasource.url=jdbc:h2:tcp://localhost/~/test
+spring.datasource.driver-class-name=org.h2.Driver
+```
+
+스프링이 application.properties에 설정된 값을 읽고, 자동으로 `DataSource` 빈 객체를 만들어줌
+
+→ 그러므로 `DataSource`는 바로 DI에 이용될 수 있음
+
+### DataSource
+
+데이터베이스 커넥션을 획득할 때 사용하는 객체
+
+스프링부트가 application.properties에 설정된 데이터베이스 커넥션 정보를 바탕으로 `DataSource` 를 스프링 빈으로 등록함
+
+### JdbcMemberRepository
+
+```jsx
+package com.example.springbootmemberServicedemo.repository;
+
+import com.example.springbootmemberServicedemo.domain.Member;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.datasource.DataSourceUtils;
+
+import javax.sql.DataSource;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+public class JdbcMemberRepository implements MemberRepository {
+
+    private final DataSource dataSource;
+
+    @Autowired
+    public JdbcMemberRepository(DataSource dataSource) {
+        this.dataSource = dataSource;
+    }
+
+    private Connection getConnection() {
+        return DataSourceUtils.getConnection(dataSource);
+    }
+    private void close(Connection conn) throws SQLException {
+        DataSourceUtils.releaseConnection(conn, dataSource);
+    }
+
+    private void close(Connection conn, PreparedStatement pstmt, ResultSet rs) {
+        try {
+            if (rs != null) {
+                rs.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        try {
+            if (pstmt != null) {
+                pstmt.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        try {
+            if (conn != null) {
+                close(conn);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public Member save(Member member) {
+        String sql = "insert into member(name) values(?)";
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = getConnection();
+            pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+
+            pstmt.setString(1, member.getName());
+
+            pstmt.executeUpdate();
+            rs = pstmt.getGeneratedKeys();
+
+            if (rs.next()) {
+                member.setId(rs.getLong(1));
+            }
+            else {
+                throw new SQLException("id 조회 실패");
+            }
+
+            return member;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            close(conn, pstmt, rs);
+        }
+        return null;
+    }
+
+    @Override
+    public Optional<Member> findById(Long id) {
+        String sql = "select * from member where id = ?";
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setLong(1, id);
+
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                Member member = new Member();
+                member.setId(rs.getLong("id"));
+                member.setName(rs.getString("name"));
+
+                return Optional.of(member);
+            } else {
+                return Optional.empty();
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        } finally {
+            close(conn, pstmt, rs);
+        }
+    }
+
+    @Override
+    public Optional<Member> findByName(String name) {
+        String sql = "select * from member where name = ?";
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = getConnection();
+            pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, name);
+
+            rs = pstmt.executeQuery();
+
+            if (rs.next()) {
+                Member member = new Member();
+                member.setId(rs.getLong("id"));
+                member.setName(rs.getString("name"));
+
+                return Optional.of(member);
+            } else {
+                return Optional.empty();
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        } finally {
+            close(conn, pstmt, rs);
+        }
+    }
+
+    @Override
+    public List<Member> findAll() {
+        String sql = "select * from member";
+
+        Connection conn = null;
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = getConnection();
+            pstmt = conn.prepareStatement(sql);
+            rs = pstmt.executeQuery();
+
+            List<Member> members = new ArrayList<>();
+
+            while (rs.next()) {
+                Member member = new Member();
+                member.setId(rs.getLong("id"));
+                member.setName(rs.getString("name"));
+                members.add(member);
+            }
+
+            return members;
+
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        } finally {
+            close(conn, pstmt, rs);
+        }
+    }
+}
+```
+
+`application.properties` 에서 설정한 값으로 `DataSource`가 빈 객체로 자동 등록 됨
+
+→ 바로 `@Autowired` 를 통해서 `DataSource` 빈을 주입받을 수 있음
+
+DB에 연결은 직접 수행하는 것이 아니라 `DataSourceUtils` 를 통해서 이루어지도록 만들 것
+
+### SpringConfig 변경
+
+`MemberRepository` 빈 등록에서 메모리 구현체를 Jdbc 구현체로 변경
+
+```jsx
+@Configuration
+  public class SpringConfig {
+      private final DataSource dataSource;
+
+			public SpringConfig(DataSource dataSource) { 
+					this.dataSource = dataSource;
+			}
+
+      @Bean
+      public MemberService memberService() {
+          return new MemberService(memberRepository());
+      }
+      @Bean
+      public MemberRepository memberRepository() {
+//      return new MemoryMemberRepository();
+        return new JdbcMemberRepository(dataSource);
+      }
+}
+```
+
+### 개방-폐쇄 원칙(OCP, Open-Closed Principle) in SOLID
+
+→ 확장에는 열려있고, 수정이나 변경에는 닫혀있어야 한다는 규칙
+
+스프링의 DI는 기존 코드를 수정하지 않고, 설정(빈 등록)의 변경으로 구현 클래스를 변경
+
+→ 스프링의 이런 기능은 객체 지향 프로그래밍을 원활하게 수행하도록 돕는다
