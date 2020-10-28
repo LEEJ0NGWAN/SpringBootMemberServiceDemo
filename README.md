@@ -1127,3 +1127,107 @@ public class MemberServiceIntegrationTest {
 스프링 부트  컨테이너를 연동해야 하는 무거운 테스트 케이스는 좋지 않을 확률이 크다
 
 → 기능 단위로 상세하게 분리되고, 순수한 테스트 케이스가 좋을 확률이 크다
+
+## 스프링 JdbcTemplate
+
+순수 Jdbc의 번거로운 과정을 해소시킨 패턴 (JdbcTemplate, MyBatis 같은 라이브러리 등장 계기)
+
+순수 Jdbc와 동일한 의존성 및 DataSource 설정을 유지
+
+sql 문은 직접 작성해야 한다.
+
+### JdbcTemplateMemberRepository
+
+```jsx
+package com.example.springbootmemberServicedemo.repository;
+
+import com.example.springbootmemberServicedemo.domain.Member;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.simple.SimpleJdbcInsert;
+
+import javax.sql.DataSource;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+public class JdbcTemplateMemberRepository implements MemberRepository{
+
+    private final JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    public JdbcTemplateMemberRepository(DataSource dataSource) {
+        jdbcTemplate = new JdbcTemplate(dataSource);
+    }
+
+    private RowMapper<Member> memberRowMapper() {
+        return (rs, rowNum) -> {
+            Member member = new Member();
+            member.setId(rs.getLong("id"));
+            member.setName(rs.getString("name"));
+            return member;
+        };
+    }
+
+    @Override
+    public Member save(Member member) {
+        SimpleJdbcInsert jdbcInsert = new SimpleJdbcInsert(jdbcTemplate);
+        jdbcInsert.withTableName("member")
+                .usingGeneratedKeyColumns("id");
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("name", member.getName());
+
+        Number id = jdbcInsert
+                .executeAndReturnKey(new MapSqlParameterSource(parameters));
+        member.setId(id.longValue());
+
+        return member;
+    }
+
+    @Override
+    public Optional<Member> findById(Long id) {
+        List<Member> result = jdbcTemplate
+                .query("select * from member where id = ?", memberRowMapper(), id);
+
+        return result.stream().findAny();
+    }
+
+    @Override
+    public Optional<Member> findByName(String name) {
+        List<Member> result = jdbcTemplate
+                .query("select * from member where name = ?", memberRowMapper(), name);
+
+        return result.stream().findAny();
+    }
+
+    @Override
+    public List<Member> findAll() {
+        return jdbcTemplate.query("select * from member", memberRowMapper());
+    }
+}
+```
+
+`JdbcTemplate` : 순수 Jdbc의 반복 작업을 생략시킨 템플릿 메소드 라이브러리
+
+생성자 호출 할 때 `JdbcTemplate` 객체를 따로 생성해야 한다.
+
+이때, `DataSource` 빈 객체를 스프링 컨테이너에서 주입 받는다.
+
+`RowMapper` 콜백 함수를 만들어서, 데이터베이스에서 가져온 데이터를 회원 객체로 가공하는 작업을 위임한다.
+
+### SpringConfig 변경
+
+MemberRepository 스프링 빈 등록 객체를 변경
+
+```jsx
+@Bean
+    public MemberRepository memberRepository() {
+//        return new MemoryMemberRepository();
+//        return new JdbcMemberRepository(dataSource);
+        return new JdbcTemplateMemberRepository(dataSource);
+    }
+```
