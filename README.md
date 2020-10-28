@@ -1046,3 +1046,84 @@ DB에 연결은 직접 수행하는 것이 아니라 `DataSourceUtils` 를 통�
 스프링의 DI는 기존 코드를 수정하지 않고, 설정(빈 등록)의 변경으로 구현 클래스를 변경
 
 → 스프링의 이런 기능은 객체 지향 프로그래밍을 원활하게 수행하도록 돕는다
+
+## 스프링 통합 테스트
+
+스프링 컨테이너를 연동한 테스트 수행
+
+### MemberServiceIntegrationTest
+
+`@SpringBootTest` : 테스트 케이스 실행 시, 스프링 부트 컨테이너를 함께 실행시킴
+
+`@Transactional` : 테스트 케이스 실행 시, 각각의 단위 테스트의 수행이 끝난 후, DB의 트랜잭션을 롤백시킴
+
+→ 단, 테스트가 아닌 일반 서비스에 붙은 경우, 당연히 트랜잭션 커밋이 진행됨
+
+```jsx
+package com.example.springbootmemberServicedemo.service;
+
+import com.example.springbootmemberServicedemo.domain.Member;
+import com.example.springbootmemberServicedemo.repository.MemberRepository;
+import com.example.springbootmemberServicedemo.repository.MemoryMemberRepository;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+@SpringBootTest
+@Transactional
+public class MemberServiceIntegrationTest {
+
+    @Autowired MemberService memberService;
+    @Autowired MemberRepository memberRepository;
+
+    @Test
+    public void join() {
+        // given
+        Member member = new Member();
+        member.setName("TEST");
+
+        // when
+        Long saveId = memberService.join(member);
+
+        // then
+        Member result = memberService.findMember(saveId).get();
+        assertThat(member.getName()).isEqualTo(result.getName());
+    }
+
+    @Test
+    public void duplicated_join_exception() {
+        // given
+        Member member1 = new Member();
+        member1.setName("TEST");
+
+        Member member2 = new Member();
+        member2.setName("TEST");
+
+        // when
+        memberService.join(member1);
+
+        /*
+        try {
+            memberService.join(member2);
+            fail("");
+        } catch (IllegalStateException e) {
+            assertThat(e.getMessage()).isEqualTo("이미 존재하는 회원입니다.");
+        }
+        */
+
+        // then
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> memberService.join(member2));
+        assertThat(e.getMessage()).isEqualTo("이미 존재하는 회원입니다.");
+    }
+}
+```
+
+스프링 부트  컨테이너를 연동해야 하는 무거운 테스트 케이스는 좋지 않을 확률이 크다
+
+→ 기능 단위로 상세하게 분리되고, 순수한 테스트 케이스가 좋을 확률이 크다
