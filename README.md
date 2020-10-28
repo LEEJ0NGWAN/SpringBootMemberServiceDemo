@@ -1231,3 +1231,193 @@ MemberRepository 스프링 빈 등록 객체를 변경
         return new JdbcTemplateMemberRepository(dataSource);
     }
 ```
+
+## JPA
+
+Java Persistence API
+
+자바의 객체가 영속성을 가지도록, 데이터베이스 객체와 맵핑(ORM)할 수 있도록 보조하는 API
+
+JPA를 이용하면 Jdbc를 통해 전달할 SQL도 자동으로 만들어준다.
+
+그러므로, SQL 및 DB의 데이터 중심의 설계에서 자바의 객체 중심 설계로 개발 패러다임을 바꿀 수 있다.
+
+→ JPA를 통해 객체 중심으로 패러다임이 전환 되므로 개발 생산성을 크게 높일 수 있다.
+
+### build.grade
+
+JPA 관련 의존성 추가
+
+```jsx
+//	implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+```
+
+`spring-boot-starter-data-jpa` 라이브러리는 내부에 jdbc 관련 의존성도 포함
+
+그러므로, 기존의 jdbc 라이브러리를 제거해도 상관 없음
+
+### application.properties
+
+JPA 관련 설정을 추가
+
+```jsx
+spring.jpa.show-sql=true
+spring.jpa.hibernate.ddl-auto=none
+```
+
+`show-sql` : jpa에서 자동으로 생성된 sql 문의 확인 여부
+
+`ddl-auto` : jpa Entity 로 설정된 객체에 대한 데이터베이스 테이블 생성 여부
+
+→ `create` : 해당 클래스에 대한 테이블을 자동 생성
+
+→ `none` : 테이블을 자동 생성하지 않음 (기존의 h2 데이터베이스에 이미 Member 테이블이 있기 때문에 해제)
+
+### Member
+
+기존 Member 클래스를 jpa에서 관리하는 `Entity` 로 맵핑
+
+```jsx
+package com.example.springbootmemberServicedemo.domain;
+
+import javax.persistence.*;
+
+@Entity
+public class Member {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "name")
+    private String name;
+
+		//getter & setter
+}
+```
+
+`@Entity` : 해당 클래스가 JPA에서 맵핑 할 클래스 라고 선언
+
+`@Id` : 데이터베이스의 pk 와 매칭
+
+`@GeneratedValue` : 설정하지 않으면, 자동으로 값이 설정 되는 것을 의미
+
+→ `strategy` : 자동으로 설정될 값을 생성하는 방식
+
+→ `IDENTITY` : 데이터베이스 차원에서 해당 column의 값을 자동으로 생성하는 유형
+
+`@Column` : 데이터베이스의 컬럼과 매칭
+
+→ `name` : 매칭될 데이터베이스 컬럼의 이름
+
+### JpaMemberRepository
+
+```jsx
+package com.example.springbootmemberServicedemo.repository;
+
+import com.example.springbootmemberServicedemo.domain.Member;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import javax.persistence.EntityManager;
+import java.util.List;
+import java.util.Optional;
+
+public class JpaMemberRepository implements MemberRepository {
+
+    private final EntityManager em;
+
+    @Autowired
+    public JpaMemberRepository(EntityManager em) {
+        this.em = em;
+    }
+
+    @Override
+    public Member save(Member member) {
+        em.persist(member);
+        return member;
+    }
+
+    @Override
+    public Optional<Member> findById(Long id) {
+        Member member = em.find(Member.class, id);
+        return Optional.ofNullable(member);
+    }
+
+    @Override
+    public Optional<Member> findByName(String name) {
+        List<Member> result = em
+                .createQuery("select m from Member m where name = :name", Member.class)
+                .setParameter("name", name)
+                .getResultList();
+
+        return result.stream().findAny();
+    }
+
+    @Override
+    public List<Member> findAll() {
+        return em.createQuery("select m from Member m", Member.class)
+                .getResultList();
+    }
+}
+```
+
+`EntityManager` : Jpa를 통해 데이터베이스에 접근하기 위한 객체
+
+→ DataSource 를 받아와서 생성되며, 마찬가지로 스프링 컨테이너 차원에서 관리되는 빈 객체로 자동 등록됨
+
+`persist` : 객체를 보존 시키는 메소드로, 말 그대로 객체에 영속성을 부여한다는 의미를 내포
+
+→ 자동으로 데이터베이스 트랜잭션을 실행
+
+### MemberService
+
+`@Transactional` 애노테이션을 추가
+
+`@Transactional` : 해당 클래스의 메서드를 실행할 때, 트랜잭션을 시작하고 정상 종료 시에 커밋시키도록 설정
+
+→ 런타임 예외가 발생하면 해당 트랜잭션을 취소하고 롤백하도록 처리함
+
+JPA를 이용한 모든 데이터 변경은 트랜잭션 안에서 실행 되어야 함
+
+```jsx
+@Transactional
+public class MemberService {
+		...
+}
+```
+
+### SpringConfig
+
+```jsx
+public class SpringConfig {
+
+//    private final DataSource dataSource;
+//
+//    public SpringConfig(DataSource dataSource) {
+//        this.dataSource = dataSource;
+//    }
+
+    private final EntityManager em;
+
+    @Autowired
+    public SpringConfig(EntityManager em) {
+        this.em = em;
+    }
+
+    @Bean
+    public MemberService memberService() {
+        return new MemberService(memberRepository());
+    }
+
+    @Bean
+    public MemberRepository memberRepository() {
+//        return new MemoryMemberRepository();
+//        return new JdbcMemberRepository(dataSource);
+//        return new JdbcTemplateMemberRepository(dataSource);
+        return new JpaMemberRepository(em);
+    }
+}
+```
+
+`DataSource` 와 마찬가지로 `EntityManager` 또한 스프링 컨테이너에 자동으로 빈 등록이 됨
