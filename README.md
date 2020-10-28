@@ -1421,3 +1421,79 @@ public class SpringConfig {
 ```
 
 `DataSource` 와 마찬가지로 `EntityManager` 또한 스프링 컨테이너에 자동으로 빈 등록이 됨
+
+## 스프링 데이터 JPA
+
+기본적으로 단순하게 구현될 CRUD 마저 인터페이스로 생략하고 나온 기술
+
+표준 조합 = 스프링 부트 + JPA + 스프링 데이터 JPA
+
+### SpringDataJpaMemberRepository
+
+```jsx
+package com.example.springbootmemberServicedemo.repository;
+
+import com.example.springbootmemberServicedemo.domain.Member;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface SpringDataJpaMemberRepository extends JpaRepository<Member, Long>, MemberRepository {
+
+    // JPQL: select m from Member m where m.name = ?;
+    @Override
+    Optional<Member> findByName(String name);
+}
+```
+
+`JpaRepository` 와 구현하려는 `MemberRepository` 를 전부 상속 받는 인터페이스
+
+`<Member, Long>` : Member 라는 개체에 대한 리포지토리이며, pk 는 Long 타입
+
+`JpaRepository`를 상속 받는 것을 통해 기본적인(공통적인) CRUD (예를 들어, pk에 대한 조회와 변경 등) 제공
+
+그 외, 공통 되지 않는 기능 (name 컬럼에 대한 검색)은 규칙적인 네이밍을 통해 JPQL 자동 생성 가능
+
+### SpringConfig
+
+```jsx
+package com.example.springbootmemberServicedemo;
+
+import com.example.springbootmemberServicedemo.repository.*;
+import com.example.springbootmemberServicedemo.service.MemberService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class SpringConfig {
+
+    private final MemberRepository memberRepository;
+
+    @Autowired
+    public SpringConfig(MemberRepository memberRepository) {
+        this.memberRepository = memberRepository;
+    }
+
+    @Bean
+    public MemberService memberService() {
+        return new MemberService(memberRepository);
+    }
+}
+```
+
+`JpaRepository` 를 상속 받는 인터페이스 `SpringDataJpaMemberRepository`를 만드는 것을 통해,
+
+`MemberRepository` 객체가 스프링 빈 으로 자동 등록 됨
+
+### 스프링 데이터 JPA 가 제공하는 기능
+
+- 인터페이스를 통한 기본적인 CRUD
+- findByName(), findByEmail() 과 같이 메서드 이름의 Override를 통해 조회 기능 구현
+- 페이징 기능을 자동으로 제공
+
+실무의 조합 = JPA + 스프링 데이터 JPA (+ Querydsl)
+
+`Querydsl` : 복잡한 동적 쿼리를 작성하기 위한 라이브러리;
+
+어려운 쿼리는 JPA가 제공하는 네이티브 쿼리를 사용하거나, `JdbcTemplate`을 사용
