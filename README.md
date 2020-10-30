@@ -1497,3 +1497,55 @@ public class SpringConfig {
 `Querydsl` : 복잡한 동적 쿼리를 작성하기 위한 라이브러리;
 
 어려운 쿼리는 JPA가 제공하는 네이티브 쿼리를 사용하거나, `JdbcTemplate`을 사용
+
+# AOP
+
+## AOP가 필요할 때
+
+상당 수의 메소드 에서 공통된 기능을 요구할 때 (예를 들어, 메소드 호출 시간 측정)
+
+→ 메소드 구성의 분리가 요구됨
+
+공통 관심 사항(cross-cutting concern) vs 핵심 관심 사항(core concern)
+
+공통 로직을 핵심 로직과 섞이게 만들면 유지 보수의 불편함이 생김
+
+→ AOP를 적용
+
+## AOP (Aspect Oriented Programming)
+
+요소 지향 프로그래밍; 각 기능의 공통되는 사항을 따로 분리시켜서 각 기능에는 핵심 로직 만 남도록 하는 기술
+
+### TimeTraceAop
+
+```jsx
+package com.example.springbootmemberServicedemo.aop;
+
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
+import org.springframework.stereotype.Component;
+
+@Aspect
+@Component
+public class TimeTraceAop {
+
+    @Around("execution(* com.example.springbootmemberServicedemo..*(..))")
+    public Object execute(ProceedingJoinPoint joinPoint) throws Throwable {
+        long start = System.currentTimeMillis();
+        System.out.println("START: " + joinPoint.toString());
+
+        try {
+            return joinPoint.proceed();
+        } finally {
+            long finish = System.currentTimeMillis();
+            long timeMs = finish - start;
+            System.out.println("END: " + joinPoint.toString() + " " + timeMs + "ms");
+        }
+    }
+}
+```
+
+`@Aspect` : 해당 클래스가 AOP를 위한 Aspect 라는 것을 표시
+
+`@Around` : 어떤 패키지 내부의 어떤 클래스에 결합해서 프록시로 쓰일 것인가 설정
